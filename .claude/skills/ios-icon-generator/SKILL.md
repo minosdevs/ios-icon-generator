@@ -2,22 +2,25 @@
 name: ios-icon-generator
 description: >
   Genere plusieurs propositions d'icone d'app iOS a partir d'une description en langage
-  naturel, via OpenAI (gpt-image-1), dans 4 styles differents, avec une planche-contact
-  (collage) automatique en une seule image. Charge ce skill des qu'on parle de
-  creer/generer une icone d'app, un logo d'app, un app icon, ou dès que l'utilisateur
-  tape /icon.
+  naturel, via OpenAI (gpt-image-1) — 8 variations avec chacune sa PROPRE palette de
+  couleur ET son propre motif (pas juste un style de rendu different), avec une
+  planche-contact (collage) automatique en une seule image. Charge ce skill des qu'on
+  parle de creer/generer une icone d'app, un logo d'app, un app icon, ou dès que
+  l'utilisateur tape /icon.
 ---
 
 # ios-icon-generator — icone d'app iOS par IA
 
 ## Ce que fait ce skill
 
-A partir d'**une phrase** decrivant l'app ("app de recettes de cuisine, chaleureuse,
-orange"), il genere **plusieurs propositions d'icone carree (1024×1024)**, prêtes pour
-l'App Store, via un vrai appel a l'API OpenAI (`gpt-image-1`) — pas un mockup, une vraie
-image generee. Par defaut il couvre **4 styles** (`flat`, `gradient`, `glass`, `3d`) pour
-donner un vrai choix, puis assemble tout dans **une seule image de planche-contact**
-(`collage.png`) facile a montrer/comparer d'un coup d'œil.
+A partir d'**une phrase** decrivant l'app ("app de recettes de cuisine, chaleureuse"),
+il genere **8 propositions d'icone carree (1024×1024)**, prêtes pour l'App Store, via un
+vrai appel a l'API OpenAI (`gpt-image-1`) — pas un mockup, une vraie image generee.
+Chaque proposition a sa **propre palette de couleur** ET son **propre motif/angle
+creatif** (objet litteral, emblème abstrait, mascotte, silhouette, texture…) — le but est
+une vraie diversite, pas 8 fois le meme dessin redessine dans un style different. Le tout
+est assemble dans **une seule image de planche-contact** (`collage.png`) facile a
+montrer/comparer d'un coup d'œil.
 
 ## Prerequis
 
@@ -43,7 +46,8 @@ meme les icones (juste pas le collage PNG) et le dit clairement.
    ```
    node scripts/generate-icon.mjs --prompt "<description>"
    ```
-   (par defaut : les 4 styles, 2 propositions chacun = 8 icones + 1 collage).
+   (par defaut : les 8 variations couleur+motif = 8 icones + 1 collage. `--n 3` pour
+   moins, `--only <label>` pour une seule variation precise, `--list` pour voir les 8).
 4. **Montre le rendu** : affiche `icons/collage.png` a l'utilisateur (une seule image,
    toutes les propositions labellisees par style).
 5. **Laisse l'utilisateur choisir** sa preferee — une seule question, pas dix.

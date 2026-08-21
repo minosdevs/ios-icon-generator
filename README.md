@@ -1,8 +1,8 @@
 # ios-icon-generator 🎨
 
-**Génère des propositions d'icône d'app iOS à partir d'une simple description, via l'API OpenAI (`gpt-image-1`) — dans plusieurs styles, avec une planche-contact automatique.**
+**Génère des propositions d'icône d'app iOS à partir d'une simple description, via l'API OpenAI (`gpt-image-1`) — 8 couleurs ET 8 motifs vraiment différents, avec une planche-contact automatique.**
 
-Pas de mockup, pas de Photoshop, pas de designer à payer : une phrase en langage naturel entre, une image unique avec **toutes les propositions côte à côte** sort. Zéro dépendance pour la génération (Node 18+ suffit), une seule dépendance optionnelle (`sharp`) pour la planche-contact.
+Pas de mockup, pas de Photoshop, pas de designer à payer : une phrase en langage naturel entre, une image unique avec **8 propositions réellement distinctes** sort — pas 8 fois le même dessin redessiné dans un style différent. Zéro dépendance pour la génération (Node 18+ suffit), une seule dépendance optionnelle (`sharp`) pour la planche-contact.
 
 Disponible en **script CLI autonome** *et* en **skill/commande Claude Code** (`/icon`).
 
@@ -11,16 +11,16 @@ Disponible en **script CLI autonome** *et* en **skill/commande Claude Code** (`/
 ## Exemple réel — testé en live
 
 Prompt donné : `"app mobile de recettes de cuisine maison, chaleureuse et simple"`.
-Commande : `node scripts/generate-icon.mjs --prompt "..."` — par défaut, ça couvre **4 styles** (`flat`, `gradient`, `glass`, `3d`), 2 propositions chacun.
+Commande : `node scripts/generate-icon.mjs --prompt "..."` (aucun autre flag — 8 variations prédéfinies, chacune avec **sa propre palette de couleur ET son propre motif**).
 
 <p align="center">
-  <img src="examples/collage.png" width="720" alt="Planche-contact des 8 icônes générées">
+  <img src="examples/collage.png" width="720" alt="Planche-contact de 8 icônes vraiment différentes">
 </p>
 
-8 icônes, 4 styles, **une seule commande**, assemblées automatiquement en une seule image. Zoom sur une proposition :
+Marmite qui fume, bol + plante, pomme translucide, mascotte cuisinier, geste de cuisson, carnet + couverts, livre stylisé, texture de pâte — **8 idées différentes**, 8 palettes différentes, en une seule commande. Zoom sur une proposition :
 
 <p align="center">
-  <img src="examples/closeup-flat-1.png" width="180" alt="Gros plan sur une icône générée">
+  <img src="examples/closeup-clay-coral.png" width="180" alt="Gros plan sur une icône générée">
 </p>
 
 C'est exactement ce que produit le script — pas une maquette, un vrai appel à `gpt-image-1`.
@@ -62,28 +62,42 @@ node scripts/generate-icon.mjs --prompt "app de suivi de sport, énergique, bleu
 ```
 
 Ça écrit dans `./icons/` :
-- une icône PNG par style/proposition (`flat-1.png`, `gradient-2.png`, …)
+- une icône PNG par variation (`flat-ember.png`, `gradient-ocean.png`, …)
 - **`collage.png`** — toutes les propositions assemblées en une seule image, labellisées
 - `contact-sheet.html` — la même chose en HTML, à ouvrir dans un navigateur
+
+### Les 8 variations (couleur + motif, pas juste un style de rendu)
+
+| Label | Palette | Motif demandé à l'IA |
+|---|---|---|
+| `flat-ember` | rouge braise / orange brûlé | l'outil le plus emblématique de l'app, dessiné littéralement |
+| `gradient-ocean` | bleu océan → turquoise | un emblème géométrique abstrait qui capture le *ressenti* de l'app |
+| `glass-berry` | violet baie / rose | un motif inspiré de la nature lié au thème de l'app |
+| `clay-forest` | vert forêt / or moutarde | une mascotte simplifiée représentant l'app |
+| `flat-sunshine` | jaune soleil / corail | l'action centrale de l'app, comme symbole dynamique |
+| `mono-mint` | noir & blanc + accent menthe | un objet du quotidien réinterprété de façon inattendue |
+| `gradient-midnight` | bleu nuit / or | une silhouette forte représentant la valeur cœur de l'app |
+| `clay-coral` | corail / crème | un motif ou une texture abstraite liée au thème |
 
 ### Options
 
 | Flag | Défaut | Description |
 |---|---|---|
 | `--prompt`, `-p` | *(obligatoire)* | Description de l'app en langage naturel |
-| `--style` | `all` | `flat` \| `gradient` \| `glass` \| `3d` \| `all` (les 4) |
-| `--n` | `2` | Nombre de propositions **par style** |
+| `--n` | `8` | Nombre total d'icônes (cycle sur les 8 variations) |
+| `--only <label>` | — | Une seule variation précise (voir `--list`) |
+| `--list` | — | Affiche les 8 variations disponibles et quitte |
 | `--out` | `./icons` | Dossier de sortie |
 | `--size` | `1024x1024` | Taille de l'image |
 | `--quality` | `high` | `high` \| `medium` \| `low` |
 | `--no-collage` | — | Saute la planche-contact PNG (juste les icônes + le HTML) |
 
 ```bash
-# Un seul style, plus de variations
-node scripts/generate-icon.mjs --prompt "app de méditation, apaisante, violet" --style glass --n 4
+# Juste 3 icônes (les 3 premières variations de la liste)
+node scripts/generate-icon.mjs --prompt "app de méditation, apaisante" --n 3
 
-# Génération rapide/économique (1 seule image)
-node scripts/generate-icon.mjs --prompt "app de finance perso, sérieuse, vert" --style flat --n 1 --quality medium
+# Une seule variation précise, en qualité réduite (rapide/économique)
+node scripts/generate-icon.mjs --prompt "app de finance perso, sérieuse" --only mono-mint --quality medium
 ```
 
 ### Juste refaire le collage (sur un dossier d'icônes existant)
@@ -120,9 +134,12 @@ node generate-assets.mjs icon --src ./icons/flat-1.png --out ./assets/images
 
 - **`POST /v1/images/generations`**, modèle `gpt-image-1`, `background: "opaque"` forcé
   (Apple **refuse** la transparence sur l'icône App Store).
-- **Le prompt réel envoyé à l'IA** n'est pas ta phrase brute : il est enrichi en un vrai
-  brief de designer (composition carrée, un seul motif centré, **aucun texte/lettre**,
-  couleurs franches, lisible en petit) — voir `buildPrompt()` dans
+- **Le prompt réel envoyé à l'IA** n'est pas ta phrase brute : chaque variation lui ajoute
+  une **palette de couleur imposée** et un **angle créatif imposé** (quel motif dessiner —
+  objet littéral, emblème abstrait, mascotte, silhouette…), en plus des règles de base
+  (composition carrée, un seul motif centré, **aucun texte/lettre**, lisible en petit).
+  C'est ce qui évite le piège du « même dessin, juste redessiné dans un style différent » —
+  voir `VARIATIONS` et `buildPrompt()` dans
   [`scripts/generate-icon.mjs`](scripts/generate-icon.mjs).
 - **Le collage** (`scripts/make-collage.mjs`) redimensionne chaque icône, l'arrondit
   (masque SVG), et compose le tout sur un seul canvas avec légendes — exporté aussi comme
