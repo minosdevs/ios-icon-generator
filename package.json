@@ -1,17 +1,21 @@
 {
   "name": "ios-icon-generator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Genere des icones d'app iOS via IA (OpenAI gpt-image-1 et/ou Gemini) a partir d'une simple description en langage naturel.",
+  "description": "Genere des icones d'app iOS via IA (OpenAI gpt-image-1) a partir d'une description en langage naturel, avec planche-contact automatique.",
   "type": "module",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "generate": "node scripts/generate-icon.mjs"
+    "generate": "node scripts/generate-icon.mjs",
+    "collage": "node scripts/make-collage.mjs"
   },
   "bin": {
     "ios-icon-generator": "./scripts/generate-icon.mjs"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.33.5"
   },
   "license": "MIT",
   "author": "Minos <https://x.com/minosdevs>",
@@ -19,7 +23,7 @@
     "ios",
     "app-icon",
     "openai",
-    "gemini",
+    "gpt-image-1",
     "claude-code",
     "expo",
     "app-store"

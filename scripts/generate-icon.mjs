@@ -2,24 +2,23 @@
 // ios-icon-generator — generate-icon
 // -----------------------------------------------------------------------------
 // Genere plusieurs propositions d'icone d'app iOS a partir d'une description en
-// langage naturel, via OpenAI (gpt-image-1) et/ou Google Gemini (image gen
-// native). Zero dependance : Node 18+ suffit (fetch + fs sont natifs).
+// langage naturel, via OpenAI (gpt-image-1). Zero dependance : Node 18+ suffit
+// (fetch + fs sont natifs).
 //
 // Usage :
 //   node scripts/generate-icon.mjs --prompt "app de recettes de cuisine, chaleureuse, orange"
-//        [--provider openai|gemini|both]   (defaut: auto -> selon les cles presentes)
-//        [--n 4]                           (nombre de propositions PAR provider)
-//        [--style flat|gradient|glass|3d]  (defaut: flat)
+//        [--style flat|gradient|glass|3d|all]  (defaut: all -> genere dans les 4 styles)
+//        [--n 2]                               (nombre de propositions PAR style)
 //        [--out ./icons]
-//        [--size 1024x1024]                (OpenAI uniquement)
-//        [--quality high|medium|low]       (OpenAI uniquement, defaut: high)
+//        [--size 1024x1024]
+//        [--quality high|medium|low]           (defaut: high)
+//        [--no-collage]                        (saute la planche-contact PNG)
 //
-// Cles lues depuis l'environnement (ou un fichier .env a la racine du repo) :
+// Cle lue depuis l'environnement (ou un fichier .env a la racine du repo) :
 //   OPENAI_API_KEY   -> https://platform.openai.com/api-keys
-//   GEMINI_API_KEY   -> https://aistudio.google.com/apikey
 //
-// Sortie : des PNG numerotes dans --out, + un contact-sheet.html pour tout
-// comparer d'un coup d'oeil dans un navigateur (file://, aucun serveur requis).
+// Sortie : des PNG numerotes dans --out, + collage.png (planche-contact en UNE
+// image, via scripts/make-collage.mjs) + contact-sheet.html (version navigateur).
 // -----------------------------------------------------------------------------
 
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
@@ -81,6 +80,8 @@ const STYLE_HINTS = {
   '3d': 'soft 3D clay / claymorphism render, rounded volumes, gentle studio lighting, subtle shadow',
 };
 
+const ALL_STYLES = Object.keys(STYLE_HINTS);
+
 function buildPrompt(userPrompt, style) {
   const hint = STYLE_HINTS[style] || STYLE_HINTS.flat;
   return [
@@ -93,7 +94,7 @@ function buildPrompt(userPrompt, style) {
   ].join(' ');
 }
 
-// ---- Provider : OpenAI (gpt-image-1) -----------------------------------------
+// ---- OpenAI (gpt-image-1) -----------------------------------------------------
 
 async function genOpenAI({ prompt, n, size, quality, apiKey }) {
   const res = await fetch('https://api.openai.com/v1/images/generations', {
@@ -120,76 +121,13 @@ async function genOpenAI({ prompt, n, size, quality, apiKey }) {
   return (json.data || []).map((d) => Buffer.from(d.b64_json, 'base64'));
 }
 
-// ---- Provider : Google Gemini (image gen native, "nano banana") --------------
-// Les noms de modele changent vite cote Google : on essaie une petite liste de
-// candidats, dans l'ordre, et on garde le premier qui repond.
-
-const GEMINI_MODEL_CANDIDATES = [
-  'gemini-2.5-flash-image',
-  'gemini-2.5-flash-image-preview',
-  'gemini-2.0-flash-exp-image-generation',
-];
-
-async function callGeminiModel(model, prompt, apiKey, withAspect) {
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-  };
-  if (withAspect) body.generationConfig.imageConfig = { aspectRatio: '1:1' };
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: 'POST',
-      headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }
-  );
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const detail = json?.error?.message || `HTTP ${res.status}`;
-    const err = new Error(detail);
-    err.status = res.status;
-    throw err;
-  }
-  const parts = json?.candidates?.[0]?.content?.parts || [];
-  const imgPart = parts.find((p) => p.inlineData?.data);
-  if (!imgPart) throw new Error('Aucune image dans la reponse Gemini (le modele a peut-etre repondu en texte seul).');
-  return Buffer.from(imgPart.inlineData.data, 'base64');
-}
-
-async function genOneGemini(prompt, apiKey) {
-  let lastErr;
-  for (const model of GEMINI_MODEL_CANDIDATES) {
-    // 1re tentative avec aspectRatio 1:1 (modeles recents), repli sans si refuse.
-    for (const withAspect of [true, false]) {
-      try {
-        return await callGeminiModel(model, prompt, apiKey, withAspect);
-      } catch (e) {
-        lastErr = e;
-        // 404 = modele inconnu -> on passe au candidat suivant sans boucler sur l'aspect.
-        if (e.status === 404) break;
-      }
-    }
-  }
-  throw new Error(`Gemini : ${lastErr ? lastErr.message : 'echec inconnu'} (modeles testes : ${GEMINI_MODEL_CANDIDATES.join(', ')})`);
-}
-
-async function genGemini({ prompt, n, apiKey }) {
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    out.push(await genOneGemini(prompt, apiKey));
-  }
-  return out;
-}
-
 // ---- Contact sheet HTML (pour tout voir d'un coup, sans serveur) ------------
 
 function writeContactSheet(outDir, entries) {
-  const cards = entries.map(({ file, provider, index }) => `
+  const cards = entries.map(({ file, style, index }) => `
     <figure>
-      <img src="./${file}" alt="${provider} #${index}">
-      <figcaption>${provider} — #${index}</figcaption>
+      <img src="./${file}" alt="${style} #${index}">
+      <figcaption>${style} — #${index}</figcaption>
     </figure>`).join('\n');
 
   const html = `<!doctype html>
@@ -221,65 +159,40 @@ async function main() {
   const userPrompt = flags.prompt || flags.p;
   if (!userPrompt) die('Donne une description de ton app :  --prompt "app de recettes de cuisine, orange, minimaliste"');
 
-  const n = parseInt(flags.n || '4', 10);
-  const style = flags.style || 'flat';
+  const n = parseInt(flags.n || '2', 10);
+  const styleArg = flags.style || 'all';
+  const styles = styleArg === 'all' ? ALL_STYLES : [styleArg];
   const size = flags.size || '1024x1024';
   const quality = flags.quality || 'high';
   const outDir = path.resolve(flags.out || './icons');
 
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
-
-  let provider = flags.provider;
-  if (!provider) {
-    if (openaiKey && geminiKey) provider = 'both';
-    else if (openaiKey) provider = 'openai';
-    else if (geminiKey) provider = 'gemini';
-    else die(
-      "Aucune cle trouvee. Colle-en une dans .env a la racine du repo :\n" +
-      "      OPENAI_API_KEY=sk-...   (https://platform.openai.com/api-keys)\n" +
-      "      GEMINI_API_KEY=...      (https://aistudio.google.com/apikey)\n" +
-      "    Une seule des deux suffit."
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    die(
+      "Aucune cle OPENAI_API_KEY trouvee. Colle-la dans .env a la racine du repo :\n" +
+      "      OPENAI_API_KEY=sk-...   (https://platform.openai.com/api-keys)"
     );
   }
 
-  if ((provider === 'openai' || provider === 'both') && !openaiKey) die('--provider openai demande OPENAI_API_KEY dans .env');
-  if ((provider === 'gemini' || provider === 'both') && !geminiKey) die('--provider gemini demande GEMINI_API_KEY dans .env');
-
-  const prompt = buildPrompt(userPrompt, style);
   mkdirSync(outDir, { recursive: true });
 
-  console.log(`\n  \u{1F3A8} Generation en cours (${provider}, style "${style}", ${n} proposition(s) par provider)...\n`);
+  const total = n * styles.length;
+  console.log(`\n  \u{1F3A8} Generation en cours — ${total} icone(s) au total (${styles.join(', ')}, ${n} par style)...\n`);
 
   const entries = [];
-
-  if (provider === 'openai' || provider === 'both') {
+  for (const style of styles) {
+    const prompt = buildPrompt(userPrompt, style);
     try {
-      console.log('     -> OpenAI (gpt-image-1)...');
-      const buffers = await genOpenAI({ prompt, n, size, quality, apiKey: openaiKey });
+      console.log(`     -> style "${style}"...`);
+      const buffers = await genOpenAI({ prompt, n, size, quality, apiKey });
       buffers.forEach((buf, i) => {
-        const file = `openai-${i + 1}.png`;
+        const file = `${style}-${i + 1}.png`;
         writeFileSync(path.join(outDir, file), buf);
-        entries.push({ file, provider: 'openai', index: i + 1 });
+        entries.push({ file, style, index: i + 1 });
         console.log(`        ✓ ${file}`);
       });
     } catch (e) {
-      console.error(`     ✖ OpenAI a echoue : ${e.message}`);
-    }
-  }
-
-  if (provider === 'gemini' || provider === 'both') {
-    try {
-      console.log('     -> Gemini (image gen native)...');
-      const buffers = await genGemini({ prompt, n, apiKey: geminiKey });
-      buffers.forEach((buf, i) => {
-        const file = `gemini-${i + 1}.png`;
-        writeFileSync(path.join(outDir, file), buf);
-        entries.push({ file, provider: 'gemini', index: i + 1 });
-        console.log(`        ✓ ${file}`);
-      });
-    } catch (e) {
-      console.error(`     ✖ Gemini a echoue : ${e.message}`);
+      console.error(`     ✖ style "${style}" a echoue : ${e.message}`);
     }
   }
 
@@ -287,9 +200,26 @@ async function main() {
 
   writeContactSheet(outDir, entries);
 
+  let collageLine = '';
+  if (!flags['no-collage']) {
+    try {
+      const { buildCollage } = await import('./make-collage.mjs');
+      const collagePath = await buildCollage({
+        inDir: outDir,
+        outFile: path.join(outDir, 'collage.png'),
+        files: entries.map((e) => e.file),
+      });
+      collageLine = `     🖼️  Planche-contact (1 seule image) : ${collagePath}\n`;
+    } catch (e) {
+      collageLine =
+        `     ⚠️  Planche-contact PNG non generee (${e.message}).\n` +
+        `        Installe sharp puis relance :  npm i sharp && node scripts/make-collage.mjs --in ${path.relative(process.cwd(), outDir)}\n`;
+    }
+  }
+
   console.log(`
   ✅ ${entries.length} icone(s) generee(s) dans : ${outDir}
-     Ouvre contact-sheet.html dans un navigateur pour tout comparer.
+${collageLine}     Ouvre contact-sheet.html dans un navigateur pour tout comparer.
 
   Etape suivante (toutes tailles + splash + favicon, via sharp) :
      node ../la-recette/scripts/generate-assets.mjs icon --src ${path.join(outDir, entries[0].file)} --out ./assets/images
@@ -298,22 +228,21 @@ async function main() {
 
 function usage() {
   console.log(`
-  ios-icon-generator — genere des icones d'app iOS via IA (OpenAI et/ou Gemini)
+  ios-icon-generator — genere des icones d'app iOS via OpenAI (gpt-image-1)
 
   node scripts/generate-icon.mjs --prompt "description de ton app" [options]
 
   Options :
     --prompt, -p     Description de l'app en langage naturel (obligatoire)
-    --provider       openai | gemini | both   (defaut : auto, selon les cles presentes)
-    --n              Nombre de propositions PAR provider (defaut : 4)
-    --style          flat | gradient | glass | 3d   (defaut : flat)
+    --style          flat | gradient | glass | 3d | all   (defaut : all -> les 4 styles)
+    --n              Nombre de propositions PAR style (defaut : 2)
     --out            Dossier de sortie (defaut : ./icons)
-    --size           Taille OpenAI (defaut : 1024x1024)
-    --quality        Qualite OpenAI : high | medium | low (defaut : high)
+    --size           Taille (defaut : 1024x1024)
+    --quality        Qualite : high | medium | low (defaut : high)
+    --no-collage     Ne genere pas la planche-contact PNG (juste les icones + le HTML)
 
-  Cles (dans .env a la racine, voir .env.example) :
+  Cle (dans .env a la racine, voir .env.example) :
     OPENAI_API_KEY   https://platform.openai.com/api-keys
-    GEMINI_API_KEY   https://aistudio.google.com/apikey
 `);
 }
 
