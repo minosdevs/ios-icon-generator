@@ -5,20 +5,26 @@
 // langage naturel, via OpenAI (gpt-image-1). Zero dependance : Node 18+ suffit
 // (fetch + fs sont natifs).
 //
+// Chaque proposition combine 3 axes DIFFERENTS (pas juste un rendu different du
+// meme dessin) : un style de rendu, une PALETTE DE COULEUR, et un ANGLE CREATIF
+// (quel motif/metaphore visuelle representer). C'est ce qui evite le piege du
+// "8 fois le meme livre de recette orange, juste redessine differemment".
+//
 // Usage :
-//   node scripts/generate-icon.mjs --prompt "app de recettes de cuisine, chaleureuse, orange"
-//        [--style flat|gradient|glass|3d|all]  (defaut: all -> genere dans les 4 styles)
-//        [--n 2]                               (nombre de propositions PAR style)
+//   node scripts/generate-icon.mjs --prompt "app de recettes de cuisine, chaleureuse"
+//        [--n 8]                  (nombre total d'icones, defaut : 8 -> les 8 variations)
+//        [--only <label>]         (une seule variation precise, voir --list)
+//        [--list]                 (affiche les variations disponibles et quitte)
 //        [--out ./icons]
 //        [--size 1024x1024]
-//        [--quality high|medium|low]           (defaut: high)
-//        [--no-collage]                        (saute la planche-contact PNG)
+//        [--quality high|medium|low]   (defaut: high)
+//        [--no-collage]                (saute la planche-contact PNG)
 //
 // Cle lue depuis l'environnement (ou un fichier .env a la racine du repo) :
 //   OPENAI_API_KEY   -> https://platform.openai.com/api-keys
 //
-// Sortie : des PNG numerotes dans --out, + collage.png (planche-contact en UNE
-// image, via scripts/make-collage.mjs) + contact-sheet.html (version navigateur).
+// Sortie : des PNG (un par variation) dans --out, + collage.png (planche-contact
+// en UNE image, via scripts/make-collage.mjs) + contact-sheet.html.
 // -----------------------------------------------------------------------------
 
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
@@ -68,35 +74,78 @@ function die(msg) {
   process.exit(1);
 }
 
-// ---- Prompt de design -------------------------------------------------------
-// On transforme la description utilisateur en un vrai brief de designer d'icone,
-// avec les regles qui font qu'une icone marche VRAIMENT sur l'App Store (carre,
-// un seul motif, pas de texte, lisible en petit).
+// ---- Les 8 variations : render x couleur x angle creatif, TOUTES differentes -
+// Le but : forcer une vraie diversite visuelle, pas 8 rendus du meme dessin.
+// `angle` dit a l'IA QUOI dessiner (le motif), independamment de la couleur —
+// c'est ce qui evite de retomber sur "le meme objet evident" a chaque fois.
 
-const STYLE_HINTS = {
-  flat: 'flat modern vector illustration style, bold clean shapes, subtle soft shadow only, minimal gradient',
-  gradient: 'smooth modern gradient background, soft glossy highlight, contemporary SaaS app style',
-  glass: 'frosted glass / glassmorphism style, translucent layered shapes, soft blur highlights, iOS 26 liquid glass aesthetic',
-  '3d': 'soft 3D clay / claymorphism render, rounded volumes, gentle studio lighting, subtle shadow',
-};
+const VARIATIONS = [
+  {
+    label: 'flat-ember',
+    render: 'flat modern vector illustration, bold clean shapes, subtle soft shadow only',
+    color: 'warm ember red and burnt orange, cream highlights',
+    angle: "the single most iconic tool or object used in this app, drawn literally and boldly",
+  },
+  {
+    label: 'gradient-ocean',
+    render: 'smooth modern gradient background, soft glossy highlight, contemporary SaaS look',
+    color: 'deep ocean blue fading to teal, white highlight',
+    angle: "an abstract geometric emblem or mark that captures the FEELING of this app — not a literal object",
+  },
+  {
+    label: 'glass-berry',
+    render: 'frosted glass / glassmorphism style, translucent layered shapes, soft blur highlights',
+    color: 'berry purple and soft pink, translucent white',
+    angle: "a nature-inspired motif (a plant, a fruit, a natural shape) connected to this app's theme",
+  },
+  {
+    label: 'clay-forest',
+    render: 'soft 3D clay / claymorphism render, rounded volumes, gentle studio lighting',
+    color: 'forest green and mustard gold',
+    angle: "a small friendly mascot-like character or creature (simplified, geometric, no face detail) representing this app",
+  },
+  {
+    label: 'flat-sunshine',
+    render: 'flat modern vector illustration, bold clean shapes, minimal gradient',
+    color: 'bright sunshine yellow and warm coral',
+    angle: "the core ACTION someone takes in this app, shown as a single dynamic symbol (not a static object)",
+  },
+  {
+    label: 'mono-mint',
+    render: 'minimal line-art / near-monochrome illustration with exactly one accent color',
+    color: 'charcoal black and white, with a single mint green accent',
+    angle: "an everyday object related to this app, reimagined in a surprising or unexpected way",
+  },
+  {
+    label: 'gradient-midnight',
+    render: 'smooth modern gradient background, soft glossy highlight, premium app look',
+    color: 'midnight navy blue and gold',
+    angle: "a bold, simplified silhouette shape that represents this app's core value or benefit",
+  },
+  {
+    label: 'clay-coral',
+    render: 'soft 3D clay / claymorphism render, rounded volumes, gentle studio lighting',
+    color: 'coral pink and cream, no other colors',
+    angle: "a playful abstract pattern or texture element related to this app's theme, used as the main shape",
+  },
+];
 
-const ALL_STYLES = Object.keys(STYLE_HINTS);
-
-function buildPrompt(userPrompt, style) {
-  const hint = STYLE_HINTS[style] || STYLE_HINTS.flat;
+function buildPrompt(userPrompt, v) {
   return [
     `Design a single professional iOS app icon for an app described as: "${userPrompt}".`,
-    `Visual style: ${hint}.`,
+    `What to depict (creative direction — follow this, do NOT default to the most generic/obvious illustration): ${v.angle}.`,
+    `Color palette — use ONLY these colors, do not default to any other palette: ${v.color}.`,
+    `Rendering style: ${v.render}.`,
     'Strict rules: one single clear focal symbol or motif, centered, filling the frame edge-to-edge in a perfect 1:1 square composition.',
     'Absolutely NO text, NO letters, NO words, NO logos of other brands anywhere in the image.',
     'No phone mockup, no browser chrome, no drop shadow outside the frame, no watermark.',
-    'Fully opaque background (no transparency), bold saturated colors, must stay readable and recognizable at very small sizes (like a 40x40 icon).',
+    'Fully opaque background (no transparency), must stay readable and recognizable at very small sizes (like a 40x40 icon).',
   ].join(' ');
 }
 
 // ---- OpenAI (gpt-image-1) -----------------------------------------------------
 
-async function genOpenAI({ prompt, n, size, quality, apiKey }) {
+async function genOpenAI({ prompt, size, quality, apiKey }) {
   const res = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
     headers: {
@@ -106,7 +155,7 @@ async function genOpenAI({ prompt, n, size, quality, apiKey }) {
     body: JSON.stringify({
       model: 'gpt-image-1',
       prompt,
-      n,
+      n: 1,
       size,
       quality,
       background: 'opaque', // App Store REFUSE l'alpha sur l'icone -> on force un fond plein
@@ -118,16 +167,18 @@ async function genOpenAI({ prompt, n, size, quality, apiKey }) {
     const detail = json?.error?.message || `HTTP ${res.status}`;
     throw new Error(`OpenAI : ${detail}`);
   }
-  return (json.data || []).map((d) => Buffer.from(d.b64_json, 'base64'));
+  const d = json.data?.[0];
+  if (!d?.b64_json) throw new Error('reponse OpenAI sans image (data[0].b64_json manquant)');
+  return Buffer.from(d.b64_json, 'base64');
 }
 
 // ---- Contact sheet HTML (pour tout voir d'un coup, sans serveur) ------------
 
 function writeContactSheet(outDir, entries) {
-  const cards = entries.map(({ file, style, index }) => `
+  const cards = entries.map(({ file, label }) => `
     <figure>
-      <img src="./${file}" alt="${style} #${index}">
-      <figcaption>${style} — #${index}</figcaption>
+      <img src="./${file}" alt="${label}">
+      <figcaption>${label}</figcaption>
     </figure>`).join('\n');
 
   const html = `<!doctype html>
@@ -148,6 +199,15 @@ function writeContactSheet(outDir, entries) {
   writeFileSync(path.join(outDir, 'contact-sheet.html'), html, 'utf8');
 }
 
+function listVariations() {
+  console.log('\n  Variations disponibles (--only <label>) :\n');
+  for (const v of VARIATIONS) {
+    console.log(`     • ${v.label.padEnd(18)} ${v.color}`);
+    console.log(`       ${' '.repeat(18)} motif : ${v.angle}`);
+  }
+  console.log('');
+}
+
 // ---- Main ---------------------------------------------------------------------
 
 async function main() {
@@ -155,16 +215,25 @@ async function main() {
   const flags = parseArgs(process.argv.slice(2));
 
   if (flags.help || flags.h) return usage();
+  if (flags.list) return listVariations();
 
   const userPrompt = flags.prompt || flags.p;
-  if (!userPrompt) die('Donne une description de ton app :  --prompt "app de recettes de cuisine, orange, minimaliste"');
+  if (!userPrompt) die('Donne une description de ton app :  --prompt "app de recettes de cuisine, chaleureuse"');
 
-  const n = parseInt(flags.n || '2', 10);
-  const styleArg = flags.style || 'all';
-  const styles = styleArg === 'all' ? ALL_STYLES : [styleArg];
   const size = flags.size || '1024x1024';
   const quality = flags.quality || 'high';
   const outDir = path.resolve(flags.out || './icons');
+
+  let selected;
+  if (flags.only) {
+    const v = VARIATIONS.find((x) => x.label === flags.only);
+    if (!v) die(`Variation inconnue : « ${flags.only} ». Lance --list pour voir les options.`);
+    selected = [v];
+  } else {
+    const n = parseInt(flags.n || String(VARIATIONS.length), 10);
+    // Cycle sur la liste si n depasse le nombre de variations definies.
+    selected = Array.from({ length: n }, (_, i) => VARIATIONS[i % VARIATIONS.length]);
+  }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -176,23 +245,24 @@ async function main() {
 
   mkdirSync(outDir, { recursive: true });
 
-  const total = n * styles.length;
-  console.log(`\n  \u{1F3A8} Generation en cours — ${total} icone(s) au total (${styles.join(', ')}, ${n} par style)...\n`);
+  console.log(`\n  \u{1F3A8} Generation en cours — ${selected.length} icone(s), toutes avec une couleur + un motif differents...\n`);
 
   const entries = [];
-  for (const style of styles) {
-    const prompt = buildPrompt(userPrompt, style);
+  const usedLabels = new Map();
+  for (const v of selected) {
+    const occurrence = (usedLabels.get(v.label) || 0) + 1;
+    usedLabels.set(v.label, occurrence);
+    const label = occurrence > 1 ? `${v.label}-${occurrence}` : v.label;
+    const prompt = buildPrompt(userPrompt, v);
     try {
-      console.log(`     -> style "${style}"...`);
-      const buffers = await genOpenAI({ prompt, n, size, quality, apiKey });
-      buffers.forEach((buf, i) => {
-        const file = `${style}-${i + 1}.png`;
-        writeFileSync(path.join(outDir, file), buf);
-        entries.push({ file, style, index: i + 1 });
-        console.log(`        ✓ ${file}`);
-      });
+      console.log(`     -> ${label}  (${v.color})...`);
+      const buf = await genOpenAI({ prompt, size, quality, apiKey });
+      const file = `${label}.png`;
+      writeFileSync(path.join(outDir, file), buf);
+      entries.push({ file, label });
+      console.log(`        ✓ ${file}`);
     } catch (e) {
-      console.error(`     ✖ style "${style}" a echoue : ${e.message}`);
+      console.error(`     ✖ ${label} a echoue : ${e.message}`);
     }
   }
 
@@ -229,13 +299,16 @@ ${collageLine}     Ouvre contact-sheet.html dans un navigateur pour tout compare
 function usage() {
   console.log(`
   ios-icon-generator — genere des icones d'app iOS via OpenAI (gpt-image-1)
+  Chaque icone combine une PALETTE DE COULEUR et un MOTIF differents (pas juste
+  un style de rendu different sur le meme dessin).
 
   node scripts/generate-icon.mjs --prompt "description de ton app" [options]
 
   Options :
     --prompt, -p     Description de l'app en langage naturel (obligatoire)
-    --style          flat | gradient | glass | 3d | all   (defaut : all -> les 4 styles)
-    --n              Nombre de propositions PAR style (defaut : 2)
+    --n              Nombre total d'icones (defaut : 8 -> les 8 variations predefinies)
+    --only <label>   Une seule variation precise (voir --list)
+    --list           Affiche les variations disponibles et quitte
     --out            Dossier de sortie (defaut : ./icons)
     --size           Taille (defaut : 1024x1024)
     --quality        Qualite : high | medium | low (defaut : high)
