@@ -1,0 +1,11 @@
+{
+  "name": "ios-icon-generator",
+  "version": "1.0.0",
+  "description": "Genere des propositions d'icone d'app iOS via IA (OpenAI gpt-image-1 et/ou Gemini) a partir d'une description en langage naturel. Une commande : /icon.",
+  "author": {
+    "name": "Minos",
+    "url": "https://x.com/minosdevs"
+  },
+  "homepage": "https://github.com/minosdevs/ios-icon-generator",
+  "keywords": ["ios", "app-icon", "openai", "gemini", "expo", "app-store", "claude-code-plugin"]
+}

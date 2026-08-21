@@ -1,0 +1,22 @@
+# Secrets — ne jamais commit
+.env
+.env.*
+!.env.example
+
+# Sorties generees (propres a chaque utilisateur, pas au repo)
+icons/
+out/
+
+# Node
+node_modules/
+*.log
+
+# OS / editeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Verrous runtime Claude Code
+.claude/*.lock
