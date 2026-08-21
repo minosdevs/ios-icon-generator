@@ -17,13 +17,24 @@ Commande : `node scripts/generate-icon.mjs --prompt "..."` (aucun autre flag —
   <img src="examples/collage.png" width="720" alt="Planche-contact de 8 icônes vraiment différentes">
 </p>
 
-Marmite qui fume, bol + plante, pomme translucide, mascotte cuisinier, geste de cuisson, carnet + couverts, livre stylisé, texture de pâte — **8 idées différentes**, 8 palettes différentes, en une seule commande. Zoom sur une proposition :
+Livre + cuillère, vague + goutte, grappe de raisin, mascotte cuisinier, geste de cuisson, marmite qui fume, carnet + toque, plateau de couverts — **8 idées différentes**, 8 palettes différentes, en une seule commande. Zoom sur une proposition (fond qui remplit bien tout le cadre, jusqu'aux 4 coins) :
 
 <p align="center">
-  <img src="examples/closeup-clay-coral.png" width="180" alt="Gros plan sur une icône générée">
+  <img src="examples/closeup-gradient-midnight.png" width="180" alt="Gros plan sur une icône générée, plein cadre">
 </p>
 
 C'est exactement ce que produit le script — pas une maquette, un vrai appel à `gpt-image-1`.
+
+> 🐛 **Piège rencontré et corrigé** : `gpt-image-1` a une manie assez tenace — quand on lui demande
+> "une icône d'app", il a tendance à **dessiner un carré arrondi flottant sur un fond**, comme s'il
+> illustrait une icône plutôt que de PRODUIRE l'image plein cadre elle-même. Résultat : un contour /
+> une marge parasite visible sur l'image source (pas juste sur le collage). C'est un vrai problème
+> pour de vrai : iOS applique **déjà** son propre arrondi + masque à l'icône fournie — un double
+> contour serait visible sur l'écran d'accueil et Apple peut rejeter ça (guideline 2.3, pas fidèle/
+> propre). Le prompt dans `buildPrompt()` interdit maintenant explicitement ce pattern ("il n'y a
+> qu'UN SEUL rectangle dans l'image : le canevas lui-même, coins 90° francs, zéro marge") — voir
+> les commentaires dans [`scripts/generate-icon.mjs`](scripts/generate-icon.mjs) si jamais ça revient
+> avec un futur modèle.
 
 ---
 
