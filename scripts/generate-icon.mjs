@@ -132,14 +132,15 @@ const VARIATIONS = [
 
 function buildPrompt(userPrompt, v) {
   return [
-    `Design a single professional iOS app icon for an app described as: "${userPrompt}".`,
+    `Create a square piece of flat graphic artwork (raw material to be used as an app icon later — NOT a mockup or render of an icon) for an app described as: "${userPrompt}".`,
     `What to depict (creative direction — follow this, do NOT default to the most generic/obvious illustration): ${v.angle}.`,
     `Color palette — use ONLY these colors, do not default to any other palette: ${v.color}.`,
     `Rendering style: ${v.render}.`,
-    'Strict rules: one single clear focal symbol or motif, centered, filling the frame edge-to-edge in a perfect 1:1 square composition.',
+    'ABSOLUTE composition rule: there is only ONE rectangle in this entire image — the canvas itself, with hard, sharp, perfectly square 90-degree corners. Do NOT draw a second rectangle or rounded-rectangle anywhere inside it. Do NOT depict "an icon" as an object (no rounded-square icon shape, no icon frame, no phone/home-screen mockup, no card, no tile, no border, no vignette, no inset panel). The scene, color and motif must reach and touch all four edges and all four corners of the image directly — imagine painting on the entire canvas with a full-bleed background, corner to corner, zero margin, zero padding.',
+    'One single clear focal symbol or motif, bold and roughly centered, drawn directly on that full-bleed background.',
     'Absolutely NO text, NO letters, NO words, NO logos of other brands anywhere in the image.',
-    'No phone mockup, no browser chrome, no drop shadow outside the frame, no watermark.',
-    'Fully opaque background (no transparency), must stay readable and recognizable at very small sizes (like a 40x40 icon).',
+    'No drop shadow outside the frame, no watermark.',
+    'Fully opaque (no transparency), must stay readable and recognizable at very small sizes (like a 40x40 icon).',
   ].join(' ');
 }
 
